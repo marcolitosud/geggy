@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#6d2f4a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Curva">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%236d2f4a'/%3E%3Cpath d='M35 120 C 60 120, 65 60, 90 60 S 120 100, 145 62' stroke='%23fdf0f2' stroke-width='11' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='145' cy='62' r='9' fill='%23f6b8c8'/%3E%3C/svg%3E">
+<title>Curva — diario glicemia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#2a1a22;
+  --deep:#6d2f4a;
+  --blush:#f6e7ea;
+  --paper:#fdf6f4;
+  --card:#ffffff;
+  --line:#ecd8dc;
+  --muted:#8a6b75;
+  --ok:#2f7d5d;
+  --warn:#b8792a;
+  --over:#b23b3b;
+  --r:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  font-size:16px;
+  line-height:1.45;
+  padding-bottom:88px;
+  -webkit-text-size-adjust:100%;
+  overscroll-behavior-y:contain;
+}
+body.locked{overflow:hidden;padding:0}
+.wrap{max-width:520px;margin:0 auto;padding:0 16px}
+
+/* ---- lock screen ---- */
+#lock{
+  position:fixed;inset:0;z-index:200;
+  background:linear-gradient(165deg,#6d2f4a 0%,#8e4560 55%,#a85a74 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px calc(24px + env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom));
+  text-align:center;
+}
+#lock.hide{display:none}
+#lock .mark{width:64px;height:64px;margin-bottom:18px}
+#lock h1{
+  font-family:'Fraunces',serif;font-weight:600;font-size:30px;
+  color:#fff;margin:0 0 4px;letter-spacing:-.01em;
+}
+#lock p{font-size:13.5px;color:rgba(255,255,255,.72);margin:0 0 26px}
+#lock .box{width:100%;max-width:300px}
+#lock input{
+  background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.3);
+  color:#fff;text-align:center;font-size:16px;margin-bottom:9px;
+  padding:13px;
+}
+#lock input::placeholder{color:rgba(255,255,255,.5)}
+#lock input:focus{outline:2px solid #fff;outline-offset:-1px;background:rgba(255,255,255,.2)}
+#lock button{
+  width:100%;background:#fff;color:var(--deep);border:0;border-radius:11px;
+  padding:13px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;
+}
+#lock .err{
+  color:#ffd9d9;font-size:13px;margin-top:11px;min-height:18px;
+}
+#lock .err.shake{animation:sh .32s}
+@keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+#lock .ded{
+  margin-top:38px;max-width:310px;
+  padding-top:20px;border-top:1px solid rgba(255,255,255,.18);
+}
+#lock .ded-q{
+  font-family:'Fraunces',serif;font-style:italic;font-weight:400;
+  font-size:16.5px;line-height:1.5;color:rgba(255,255,255,.94);
+  margin:0 0 9px;letter-spacing:.005em;
+}
+#lock .ded-s{
+  font-size:12.5px;color:rgba(255,255,255,.6);margin:0;letter-spacing:.02em;
+}
+
+/* header */
+header{
+  background:linear-gradient(160deg,#6d2f4a 0%,#8e4560 100%);
+  color:#fdf0f2;
+  padding:calc(18px + env(safe-area-inset-top)) 0 16px;
+  margin-bottom:16px;
+  border-radius:0 0 20px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+header .wrap{display:flex;align-items:center;justify-content:space-between;width:100%}
+#lockBtn{
+  border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);
+  color:#fdf0f2;border-radius:9px;padding:7px 9px;cursor:pointer;line-height:0;
+}
+#lockBtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8}
+header h1{
+  font-family:'Fraunces',serif;font-weight:600;
+  font-size:24px;margin:0;letter-spacing:-.01em;
+}
+header .sub{font-size:12.5px;opacity:.72;margin-top:2px;letter-spacing:.02em}
+
+/* today card */
+.today{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);padding:14px;margin-bottom:14px;
+}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace;font-size:11px;
+  text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+}
+.today h2{font-family:'Fraunces',serif;font-weight:600;font-size:19px;margin:4px 0 8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{
+  font-size:12.5px;padding:5px 10px;border-radius:999px;
+  background:var(--blush);border:1px solid var(--line);color:var(--deep);
+}
+.chip.done{background:var(--ok);border-color:var(--ok);color:#fff}
+
+/* tabs */
+nav.tabs{
+  position:fixed;bottom:0;left:0;right:0;z-index:50;
+  background:rgba(255,255,255,.96);backdrop-filter:blur(8px);
+  border-top:1px solid var(--line);
+  display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+nav.tabs button{
+  flex:1;border:0;background:none;padding:8px 2px;
+  font-family:inherit;font-size:11px;color:var(--muted);
+  display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;
+  border-radius:10px;
+}
+nav.tabs button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7}
+nav.tabs button.on{color:var(--deep);background:var(--blush);font-weight:600}
+
+.page{display:none}
+.page.on{display:block}
+
+/* buttons */
+.btn{
+  font-family:inherit;font-size:15px;font-weight:600;
+  border:0;border-radius:11px;padding:13px 16px;
+  background:var(--deep);color:#fff;cursor:pointer;width:100%;
+}
+.btn:active{transform:scale(.99)}
+.btn.ghost{background:var(--blush);color:var(--deep);border:1px solid var(--line)}
+.btn.sm{padding:9px 12px;font-size:13.5px;width:auto}
+.btn:disabled{opacity:.4}
+
+/* card */
+.card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);padding:14px;margin-bottom:12px;
+}
+.card h3{
+  font-family:'Fraunces',serif;font-weight:600;
+  font-size:17px;margin:0 0 10px;
+}
+label.fl{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px;font-weight:500}
+input,select,textarea{
+  width:100%;font-family:inherit;font-size:16px;padding:11px 12px;
+  border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);
+}
+textarea{resize:vertical;min-height:60px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--deep);outline-offset:-1px}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+
+/* big number input */
+.bignum{
+  font-family:'IBM Plex Mono',monospace;font-size:38px;font-weight:500;
+  text-align:center;padding:14px;letter-spacing:.02em;
+}
+
+/* verdict */
+.verdict{
+  border-radius:11px;padding:11px 13px;margin-top:10px;
+  font-size:14px;font-weight:500;display:none;line-height:1.4;
+}
+.verdict.show{display:block}
+.v-ok{background:#e6f2ec;color:var(--ok);border:1px solid #bfe0d0}
+.v-warn{background:#fbf0e0;color:var(--warn);border:1px solid #ecd6ae}
+.v-over{background:#fbe9e9;color:var(--over);border:1px solid #f0c9c9}
+
+/* timer */
+.clock{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:52px;font-weight:500;text-align:center;
+  letter-spacing:-.02em;margin:6px 0 2px;color:var(--deep);
+  font-variant-numeric:tabular-nums;
+}
+.clock.ring{color:var(--ok)}
+.clock-sub{text-align:center;font-size:13px;color:var(--muted);margin-bottom:12px}
+.ringbar{height:5px;background:var(--blush);border-radius:99px;overflow:hidden;margin-bottom:14px}
+.ringbar i{display:block;height:100%;background:var(--deep);width:0;transition:width 1s linear}
+
+/* log list */
+.log-day{margin-bottom:14px}
+.log-date{
+  font-family:'IBM Plex Mono',monospace;font-size:11px;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+  padding:0 2px 6px;
+}
+.entry{
+  display:flex;align-items:center;gap:11px;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:11px;padding:10px 12px;margin-bottom:6px;
+}
+.entry .val{
+  font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:500;
+  min-width:52px;font-variant-numeric:tabular-nums;
+}
+.entry .meta{flex:1;min-width:0}
+.entry .meta b{display:block;font-size:13.5px;font-weight:600}
+.entry .meta span{font-size:11.5px;color:var(--muted)}
+.entry .x{
+  border:0;background:none;color:var(--muted);font-size:19px;
+  cursor:pointer;padding:2px 5px;line-height:1;
+}
+.dot{width:8px;height:8px;border-radius:99px;flex:0 0 8px}
+.d-ok{background:var(--ok)}.d-over{background:var(--over)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:11px;padding:11px 12px;
+}
+.stat b{
+  font-family:'IBM Plex Mono',monospace;font-size:23px;font-weight:500;
+  display:block;line-height:1.2;
+}
+.stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+
+/* diet */
+.meal{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);margin-bottom:10px;overflow:hidden;
+}
+.meal-h{
+  padding:12px 14px;cursor:pointer;display:flex;align-items:center;
+  justify-content:space-between;gap:8px;
+}
+.meal-h b{font-family:'Fraunces',serif;font-size:16px;font-weight:600}
+.meal-h .t{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+.meal-b{display:none;padding:0 14px 13px;border-top:1px solid var(--line)}
+.meal.open .meal-b{display:block}
+.meal.open .meal-h{background:var(--blush)}
+.slot{margin-top:11px}
+.slot>label{
+  font-size:12px;color:var(--muted);font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px;
+}
+.slot .fixed{
+  font-size:14.5px;padding:10px 12px;background:var(--blush);
+  border-radius:9px;border:1px solid var(--line);
+}
+.note-md{
+  font-size:12.5px;color:var(--deep);margin-top:5px;
+  padding-left:9px;border-left:2px solid #c98aa0;line-height:1.35;
+}
+.tip{
+  font-size:13px;color:var(--muted);background:var(--blush);
+  border-radius:10px;padding:11px 12px;line-height:1.45;margin-bottom:12px;
+}
+.tip b{color:var(--deep)}
+details.rules{margin-bottom:12px}
+details.rules summary{
+  font-size:13px;color:var(--deep);cursor:pointer;padding:9px 0;font-weight:600;
+}
+details.rules div{font-size:13.5px;color:var(--muted);line-height:1.5}
+.hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:28px 16px}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl td{padding:6px 4px;border-bottom:1px solid var(--line)}
+.tbl td:last-child{text-align:right;color:var(--deep);font-weight:600;white-space:nowrap}
+.disc{font-size:11.5px;color:var(--muted);text-align:center;padding:14px 8px 4px;line-height:1.5}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body class="locked">
+
+<div id="lock">
+  <svg class="mark" viewBox="0 0 180 180" aria-hidden="true">
+    <rect width="180" height="180" rx="40" fill="rgba(255,255,255,.14)"/>
+    <path d="M35 120 C 60 120, 65 60, 90 60 S 120 100, 145 62" stroke="#fff" stroke-width="11" fill="none" stroke-linecap="round"/>
+    <circle cx="145" cy="62" r="9" fill="#f6b8c8"/>
+  </svg>
+  <h1>Curva</h1>
+  <p>Diario glicemico</p>
+  <div class="box">
+    <input id="lkUser" type="text" placeholder="Nome" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <input id="lkPass" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="lkGo">Entra</button>
+    <div class="err" id="lkErr"></div>
+  </div>
+  <div class="ded">
+    <p class="ded-q">Non è una dieta. Sono due mesi e mezzo in cui mangi anche per lei.</p>
+    <p class="ded-s">E io conto i giorni insieme a voi due.</p>
+  </div>
+</div>
+
+<header>
+  <div class="wrap">
+    <div>
+      <h1>Curva</h1>
+      <div class="sub">Diario glicemico · 28ª settimana</div>
+    </div>
+    <button id="lockBtn" aria-label="Blocca">
+      <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ OGGI ============ -->
+  <section class="page on" id="p-oggi">
+    <div class="today">
+      <div class="eyebrow">Oggi — <span id="todayDate"></span></div>
+      <h2 id="todayTask">Digiuno + colazione</h2>
+      <div class="chips" id="todayChips"></div>
+    </div>
+
+    <div class="card">
+      <h3>Registra misurazione</h3>
+      <label class="fl">Quando</label>
+      <select id="mMoment">
+        <option value="digiuno">A digiuno (mattina)</option>
+        <option value="col60">60' da colazione</option>
+        <option value="col120">120' da colazione</option>
+        <option value="pra60">60' da pranzo</option>
+        <option value="pra120">120' da pranzo</option>
+        <option value="cen60">60' da cena</option>
+        <option value="cen120">120' da cena</option>
+      </select>
+
+      <label class="fl">Glicemia (mg/dl)</label>
+      <input class="bignum" id="mVal" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="—">
+      <div class="verdict" id="mVerdict"></div>
+
+      <label class="fl">Cosa ha mangiato (facoltativo)</label>
+      <textarea id="mNote" placeholder="Es. 80g penne integrali, zucchine, 3cc olio"></textarea>
+
+      <div style="margin-top:12px"><button class="btn" id="mSave">Salva</button></div>
+    </div>
+
+    <details class="rules">
+      <summary>Soglie e regole della dottoressa</summary>
+      <div>
+        <table class="tbl">
+          <tr><td>A digiuno</td><td>minore di 90</td></tr>
+          <tr><td>60' dal pasto</td><td>minore di 130</td></tr>
+          <tr><td>120' dal pasto (solo se il 60' è maggiore di 130)</td><td>minore di 120</td></tr>
+        </table>
+        <p style="margin:9px 0 0">Rotazione: giorno 1 colazione, giorno 2 pranzo, giorno 3 cena, poi si ricomincia. Il digiuno si misura ogni mattina.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ TIMER ============ -->
+  <section class="page" id="p-timer">
+    <div class="tip"><b>Il timer parte dal primo boccone</b>, non da quando finisce di mangiare. È l'errore più comune e falsa la misurazione.</div>
+
+    <div class="card">
+      <h3>Timer pasto</h3>
+      <div class="clock" id="clk">60:00</div>
+      <div class="clock-sub" id="clkSub">Pronto</div>
+      <div class="ringbar"><i id="clkBar"></i></div>
+      <div class="row" id="clkIdle">
+        <button class="btn" data-meal="colazione">Colazione</button>
+        <button class="btn" data-meal="pranzo">Pranzo</button>
+        <button class="btn" data-meal="cena">Cena</button>
+      </div>
+      <div id="clkRun" style="display:none">
+        <button class="btn ghost" id="clkStop">Annulla timer</button>
+      </div>
+      <div class="hint" id="clkHint"></div>
+    </div>
+
+    <div class="card" id="card120" style="display:none">
+      <h3>Ricontrollo a 120'</h3>
+      <p style="font-size:14px;margin:0 0 10px;color:var(--muted)">
+        Il valore a 60' è risultato maggiore di 130. Serve una seconda misurazione a 120' dal primo boccone: deve stare minore di 120.
+      </p>
+      <button class="btn" id="start120">Avvia timer 120'</button>
+    </div>
+  </section>
+
+  <!-- ============ DIARIO ============ -->
+  <section class="page" id="p-diario">
+    <div class="stats">
+      <div class="stat"><b id="s1">—</b><span>Media digiuno</span></div>
+      <div class="stat"><b id="s2">—</b><span>Media 60'</span></div>
+      <div class="stat"><b id="s3">—</b><span>Nei target</span></div>
+      <div class="stat"><b id="s4">—</b><span>Misurazioni</span></div>
+    </div>
+    <div id="logList"></div>
+    <button class="btn ghost" id="exp" style="margin-top:6px">Esporta per la dottoressa</button>
+  </section>
+
+  <!-- ============ DIETA ============ -->
+  <section class="page" id="p-dieta">
+    <div class="tip">
+      <b>Verdura per prima, sempre.</b> Iniziare il pasto dalle verdure abbassa il picco a 60'. E 20–30 minuti di camminata dopo pranzo e cena è l'intervento singolo più efficace sui valori.
+    </div>
+    <div id="meals"></div>
+    <div class="hint" style="padding:0 2px 8px">
+      Le alternative sono isoglucidiche: sostituiscono l'alimento base a parità di carboidrati. Le grammature riportate seguono le correzioni a mano sul foglio.
+    </div>
+  </section>
+
+  <p class="disc">Strumento personale di registrazione. Non sostituisce il parere della diabetologa: le soglie e la dieta sono quelle prescritte, ogni modifica va concordata con lei.</p>
+</div>
+
+<nav class="tabs">
+  <button class="on" data-p="oggi">
+    <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" stroke-linecap="round"/></svg>Oggi</button>
+  <button data-p="timer">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6" stroke-linecap="round"/></svg>Timer</button>
+  <button data-p="diario">
+    <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4zM4 9h16M9 5v15" stroke-linejoin="round"/></svg>Diario</button>
+  <button data-p="dieta">
+    <svg viewBox="0 0 24 24"><path d="M6 3v8a3 3 0 0 0 6 0V3M9 11v10M18 3c-1.5 2-2 4-2 6s.5 3 2 3 2-1 2-3-.5-4-2-6zM18 12v9" stroke-linecap="round"/></svg>Dieta</button>
+</nav>
+
+<script>
+/* ---------- blocco schermata ---------- */
+/* Nota: l'app gira solo sul telefono, senza server. Questo blocco impedisce
+   l'apertura casuale, non è protezione crittografica: chi legge il file
+   sorgente aggira tutto. Per i dati sanitari vale il blocco schermo del telefono. */
+const SALT='curva-2026-glic';
+const USER='geraldine';
+const PWHASH='5772b372a73665c9ab2b178eca228a6875736bf27c5ea96dc08b65cdf89350b1';
+let booted=false;
+
+async function sha256(s){
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+async function unlock(){
+  const u = document.getElementById('lkUser').value.trim().toLowerCase();
+  const p = document.getElementById('lkPass').value;
+  const err = document.getElementById('lkErr');
+  if(!u || !p){ err.textContent='Inserisci nome e password.'; return; }
+  const h = await sha256(SALT+p);
+  if(u===USER && h===PWHASH){
+    document.getElementById('lock').classList.add('hide');
+    document.body.classList.remove('locked');
+    document.getElementById('lkPass').value='';
+    err.textContent='';
+    try{ sessionStorage.setItem('curva:open','1'); }catch{}
+    if(!booted){ booted=true; boot(); }
+  } else {
+    err.textContent='Nome o password non corretti.';
+    err.classList.remove('shake'); void err.offsetWidth; err.classList.add('shake');
+    document.getElementById('lkPass').value='';
+    document.getElementById('lkPass').focus();
+  }
+}
+document.getElementById('lkGo').onclick=unlock;
+document.getElementById('lkPass').addEventListener('keydown',e=>{ if(e.key==='Enter') unlock(); });
+document.getElementById('lkUser').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('lkPass').focus(); });
+document.getElementById('lockBtn').onclick=()=>{
+  try{ sessionStorage.removeItem('curva:open'); }catch{}
+  document.getElementById('lock').classList.remove('hide');
+  document.body.classList.add('locked');
+  document.getElementById('lkUser').value='';
+};
+
+/* ---------- soglie ---------- */
+const LIM = { digiuno:90, m60:130, m120:120 };
+const MOMENT_LABEL = {
+  digiuno:"A digiuno", col60:"60' colazione", col120:"120' colazione",
+  pra60:"60' pranzo", pra120:"120' pranzo", cen60:"60' cena", cen120:"120' cena"
+};
+const limitFor = m => m==='digiuno' ? LIM.digiuno : m.endsWith('120') ? LIM.m120 : LIM.m60;
+
+/* ---------- stato ---------- */
+let entries = [];
+let timer = null;
+const K_ENTRIES='curva:entries', K_TIMER='curva:timer', K_START='curva:startdate';
+let startDate = null;
+
+const todayKey = () => new Date().toISOString().slice(0,10);
+const fmtDate = d => new Date(d+'T00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+
+async function load(){
+  try{ const r = await window.storage.get(K_ENTRIES); entries = r? JSON.parse(r.value):[]; }
+  catch{ entries=[]; }
+  try{ const r = await window.storage.get(K_START); startDate = r? r.value : null; }
+  catch{ startDate=null; }
+  if(!startDate){ startDate = todayKey(); try{ await window.storage.set(K_START,startDate); }catch{} }
+  try{ const r = await window.storage.get(K_TIMER); timer = r? JSON.parse(r.value):null; }
+  catch{ timer=null; }
+}
+async function saveEntries(){
+  try{ await window.storage.set(K_ENTRIES, JSON.stringify(entries)); }
+  catch(e){ console.error(e); alert("Non sono riuscito a salvare. Riprova."); }
+}
+async function saveTimer(){
+  try{ timer ? await window.storage.set(K_TIMER, JSON.stringify(timer)) : await window.storage.delete(K_TIMER); }
+  catch(e){ console.error(e); }
+}
+
+/* ---------- rotazione 3 giorni ---------- */
+function cycleMeal(dateKey){
+  const a = new Date(startDate+'T00:00'), b = new Date(dateKey+'T00:00');
+  const d = Math.floor((b-a)/86400000);
+  return ['colazione','pranzo','cena'][((d%3)+3)%3];
+}
+
+/* ---------- OGGI ---------- */
+function renderToday(){
+  const tk = todayKey(), meal = cycleMeal(tk);
+  document.getElementById('todayDate').textContent = fmtDate(tk);
+  document.getElementById('todayTask').textContent = 'Digiuno + 60′ da ' + meal;
+
+  const today = entries.filter(e=>e.date===tk);
+  const need = ['digiuno', {colazione:'col60',pranzo:'pra60',cena:'cen60'}[meal]];
+  document.getElementById('todayChips').innerHTML = need.map(m=>{
+    const hit = today.find(e=>e.moment===m);
+    return `<span class="chip ${hit?'done':''}">${MOMENT_LABEL[m]}${hit?' · '+hit.value:''}</span>`;
+  }).join('');
+
+  // preseleziona il momento non ancora fatto
+  const sel = document.getElementById('mMoment');
+  const missing = need.find(m=>!today.some(e=>e.moment===m));
+  if(missing && !sel.dataset.touched) sel.value = missing;
+}
+
+function verdict(moment,val){
+  const lim = limitFor(moment);
+  const el = document.getElementById('mVerdict');
+  el.className='verdict show';
+  if(val < lim){
+    el.classList.add('v-ok');
+    el.textContent = `Nel target: minore di ${lim}.`;
+  } else if(moment.endsWith('60')){
+    el.classList.add('v-warn');
+    el.textContent = `Maggiore di ${lim}. Serve il ricontrollo a 120′ dal primo boccone: deve stare minore di ${LIM.m120}.`;
+  } else {
+    el.classList.add('v-over');
+    el.textContent = `Maggiore di ${lim}. Segnalo alla diabetologa al prossimo controllo. Un valore singolo non fa la media: conta l'andamento.`;
+  }
+}
+
+document.getElementById('mVal').addEventListener('input',e=>{
+  const v = parseInt(e.target.value,10);
+  if(isNaN(v)){ document.getElementById('mVerdict').className='verdict'; return; }
+  verdict(document.getElementById('mMoment').value, v);
+});
+document.getElementById('mMoment').addEventListener('change',e=>{
+  e.target.dataset.touched='1';
+  const v = parseInt(document.getElementById('mVal').value,10);
+  if(!isNaN(v)) verdict(e.target.value, v);
+});
+
+document.getElementById('mSave').addEventListener('click', async ()=>{
+  const val = parseInt(document.getElementById('mVal').value,10);
+  const moment = document.getElementById('mMoment').value;
+  if(isNaN(val) || val<20 || val>600){ alert('Inserisci un valore tra 20 e 600 mg/dl.'); return; }
+  entries.push({
+    id:Date.now(), date:todayKey(), moment, value:val,
+    note:document.getElementById('mNote').value.trim(),
+    time:new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
+  });
+  await saveEntries();
+  // se 60' sfora → proponi timer 120
+  if(moment.endsWith('60') && val>LIM.m60){
+    document.getElementById('card120').style.display='block';
+    document.getElementById('card120').dataset.meal = {col60:'colazione',pra60:'pranzo',cen60:'cena'}[moment];
+  }
+  document.getElementById('mVal').value='';
+  document.getElementById('mNote').value='';
+  document.getElementById('mVerdict').className='verdict';
+  document.getElementById('mMoment').dataset.touched='';
+  renderToday(); renderLog();
+});
+
+/* ---------- DIARIO ---------- */
+function renderLog(){
+  const box = document.getElementById('logList');
+  if(!entries.length){
+    box.innerHTML='<div class="empty">Nessuna misurazione registrata.<br>Inizia dalla scheda Oggi.</div>';
+    ['s1','s2','s3','s4'].forEach(i=>document.getElementById(i).textContent='—');
+    return;
+  }
+  const dig = entries.filter(e=>e.moment==='digiuno');
+  const p60 = entries.filter(e=>e.moment.endsWith('60'));
+  const inT = entries.filter(e=>e.value < limitFor(e.moment));
+  const avg = a => a.length? Math.round(a.reduce((s,e)=>s+e.value,0)/a.length) : '—';
+  document.getElementById('s1').textContent = avg(dig);
+  document.getElementById('s2').textContent = avg(p60);
+  document.getElementById('s3').textContent = Math.round(inT.length/entries.length*100)+'%';
+  document.getElementById('s4').textContent = entries.length;
+
+  const byDay = {};
+  entries.forEach(e=>(byDay[e.date] ||= []).push(e));
+  box.innerHTML = Object.keys(byDay).sort().reverse().map(d=>`
+    <div class="log-day">
+      <div class="log-date">${fmtDate(d)}</div>
+      ${byDay[d].sort((a,b)=>a.id-b.id).map(e=>{
+        const ok = e.value < limitFor(e.moment);
+        return `<div class="entry">
+          <span class="dot ${ok?'d-ok':'d-over'}"></span>
+          <span class="val">${e.value}</span>
+          <span class="meta">
+            <b>${MOMENT_LABEL[e.moment]}</b>
+            <span>${e.time}${e.note?' · '+e.note.replace(/</g,'&lt;'):''}</span>
+          </span>
+          <button class="x" data-del="${e.id}" aria-label="Elimina">×</button>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Eliminare questa misurazione?')) return;
+    entries = entries.filter(e=>e.id != b.dataset.del);
+    await saveEntries(); renderLog(); renderToday();
+  });
+}
+
+document.getElementById('exp').addEventListener('click',()=>{
+  if(!entries.length){ alert('Non ci sono misurazioni da esportare.'); return; }
+  let t = 'DIARIO GLICEMICO\n';
+  t += 'Soglie: digiuno minore di 90 · 60\' minore di 130 · 120\' minore di 120\n\n';
+  const byDay={}; entries.forEach(e=>(byDay[e.date] ||= []).push(e));
+  Object.keys(byDay).sort().forEach(d=>{
+    t += fmtDate(d).toUpperCase()+'\n';
+    byDay[d].sort((a,b)=>a.id-b.id).forEach(e=>{
+      const ok = e.value<limitFor(e.moment);
+      t += `  ${MOMENT_LABEL[e.moment].padEnd(16)} ${String(e.value).padStart(3)} mg/dl  ${ok?'ok':'SOPRA'}${e.note?'  — '+e.note:''}\n`;
+    });
+    t+='\n';
+  });
+  navigator.clipboard?.writeText(t).then(
+    ()=>alert('Diario copiato. Incollalo dove preferisci.'),
+    ()=>prompt('Copia il testo:',t)
+  );
+});
+
+/* ---------- TIMER ---------- */
+let tick = null;
+function startTimer(meal, mins){
+  timer = { meal, mins, end: Date.now()+mins*60000 };
+  saveTimer(); runTimer();
+}
+function runTimer(){
+  clearInterval(tick);
+  const idle=document.getElementById('clkIdle'), run=document.getElementById('clkRun');
+  const clk=document.getElementById('clk'), sub=document.getElementById('clkSub');
+  const bar=document.getElementById('clkBar'), hint=document.getElementById('clkHint');
+
+  if(!timer){
+    idle.style.display='flex'; run.style.display='none';
+    clk.textContent='60:00'; clk.classList.remove('ring');
+    sub.textContent='Pronto'; bar.style.width='0'; hint.textContent='';
+    return;
+  }
+  idle.style.display='none'; run.style.display='block';
+  hint.textContent = `Timer ${timer.mins}′ avviato per ${timer.meal}. Puoi chiudere l'app: il conto continua.`;
+
+  const upd = ()=>{
+    const left = timer.end - Date.now();
+    if(left<=0){
+      clk.textContent='00:00'; clk.classList.add('ring');
+      sub.textContent = `È ora di misurare — ${timer.mins}′ da ${timer.meal}`;
+      bar.style.width='100%';
+      clearInterval(tick);
+      return;
+    }
+    const m=Math.floor(left/60000), s=Math.floor(left%60000/1000);
+    clk.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    clk.classList.remove('ring');
+    sub.textContent = `${timer.mins}′ da ${timer.meal}`;
+    bar.style.width = (100 - left/(timer.mins*60000)*100)+'%';
+  };
+  upd(); tick=setInterval(upd,1000);
+}
+document.querySelectorAll('[data-meal]').forEach(b=>{
+  b.onclick=()=>startTimer(b.dataset.meal,60);
+});
+document.getElementById('clkStop').onclick=async()=>{
+  timer=null; await saveTimer(); runTimer();
+};
+document.getElementById('start120').onclick=()=>{
+  const meal = document.getElementById('card120').dataset.meal || 'pasto';
+  startTimer(meal,120);
+  document.getElementById('card120').style.display='none';
+  go('timer');
+};
+
+/* ---------- DIETA ---------- */
+const DIET = [
+  { name:'Colazione', time:'', slots:[
+    { label:'Latte', base:'Latte vacca parz. scremato — 250 g',
+      alts:['Yogurt parz. scremato — 150 g'] },
+    { label:'Cereali', base:'Fette biscottate integrali — 40 g',
+      alts:['Pane comune tostato — 50 g','Pane integrale tostato — 50 g','Fiocchi d\'avena — 40 g','Fiocchi di crusca di grano — 40 g'],
+      note:'Correzione a mano: il pane va tostato.' },
+    { label:'Aggiunta', base:'1 cucchiaio olio + pomodoro',
+      alts:['Ricotta','Fesa di tacchino cotta','Avocado'],
+      note:'Aggiunta scritta a mano dalla dottoressa: la quota grassa a colazione abbassa il picco.' }
+  ]},
+  { name:'Spuntino mattina', time:'', slots:[
+    { label:'Frutta secca', base:'Noci secche — 20 g', alts:['Mandorle dolci secche — 10 g'] },
+    { label:'Frutta', base:'Mela — 150 g',
+      alts:['Albicocche — 200 g','Ananas — 200 g','Arance — 200 g','Ciliege — 250 g','Clementine — 200 g','Fragole — 300 g','Kiwi — 150 g','Melone — 200 g','Pera — 150 g','Pesca — 200 g','Pompelmo — 250 g','Prugne — 200 g','Spremuta d\'arancia — 150 g','Lamponi — 150 g','Mirtilli — 150 g','More — 150 g','Cocomero — 300 g','Yogurt parz. scremato — 130 g'] }
+  ]},
+  { name:'Pranzo', time:'', slots:[
+    { label:'Primo', base:'Pasta di semola — 80 g',
+      alts:['Pasta di semola integrale — 80 g','Riso integrale — 80 g','Farro — 80 g','Orzo perlato — 80 g','Quinoa — 80 g','Cous cous — 80 g','Pane comune tostato — 90 g','Pane integrale tostato — 90 g','Fagioli borlotti freschi — 210 g','Fagioli borlotti secchi — 100 g','Ceci secchi — 90 g','Fave fresche — 300 g','Fave secche — 130 g','Legumi in scatola — 250 g','Lenticchie secche — 100 g','Piselli freschi — 300 g','Piselli secchi — 100 g','Patate — 230 g'],
+      note:'Sul foglio: riso bianco depennato, riso integrale confermato. Pasta al dente. Patate: bollite, raffreddate.' },
+    { label:'Secondo', base:'Manzo — 140 g',
+      alts:['Vitello filetto — 150 g','Vitellone tagli magri — 150 g','Petto di pollo — 160 g','Tacchino petto — 120 g','Acciuga o alice — 170 g','Cernia — 200 g','Dentice — 160 g','Merluzzo o nasello — 230 g','Orata fresca — 130 g','Palombo — 200 g','Pesce spada — 150 g','Rombo — 200 g','San Pietro — 210 g','Sogliola — 190 g','Spigola — 200 g','Tonno — 100 g','Trota — 190 g','Tonno sott\'olio sgocciolato — 80 g','Halibut — 140 g','Salmone fresco — 90 g','Sgombro — 90 g','Crescenza — 60 g','Fiocchi di latte — 140 g','Mozzarella di vacca — 60 g','Ricotta di vacca — 110 g','Stracchino — 50 g','Caciottina fresca — 60 g','Robiola — 50 g','Uova di gallina intero — 120 g (2 uova)','Tacchino fesa — 80 g'] },
+    { label:'Verdura', base:'Verdure fresche — libere', note:'La grammatura 200 g è depennata: verdura a volontà. Da mangiare per prima.' },
+    { label:'Condimento', base:'Olio EVO — 3 cucchiaini a crudo', note:'Correzione a mano: 3 cc a crudo.' }
+  ]},
+  { name:'Merenda', time:'', slots:[
+    { label:'Frutta secca', base:'Noci secche — 20 g', alts:['Mandorle dolci secche — 10 g'] },
+    { label:'Frutta', base:'Mela — 150 g',
+      alts:['Albicocche — 200 g','Ananas — 200 g','Arance — 200 g','Ciliege — 250 g','Clementine — 200 g','Fragole — 300 g','Kiwi — 150 g','Melone — 200 g','Pera — 150 g','Pesca — 200 g','Pompelmo — 250 g','Prugne — 200 g','Spremuta d\'arancia — 150 g','Lamponi — 150 g','Mirtilli — 150 g','More — 150 g','Cocomero — 300 g','Yogurt parz. scremato — 130 g'] }
+  ]},
+  { name:'Cena', time:'', slots:[
+    { label:'Primo', base:'Pasta di semola — 80 g',
+      alts:['Pasta di semola integrale — 80 g','Riso — 80 g','Riso integrale — 80 g','Farro — 80 g','Orzo perlato — 80 g','Quinoa — 80 g','Cous cous — 80 g','Pane comune — 90 g','Pane integrale — 90 g','Fagioli borlotti freschi — 210 g','Fagioli borlotti secchi — 100 g','Ceci secchi — 90 g','Fave fresche — 300 g','Fave secche — 130 g','Legumi in scatola — 250 g','Lenticchie secche — 100 g','Piselli freschi — 300 g','Piselli secchi — 100 g','Patate — 230 g'] },
+    { label:'Secondo', base:'Manzo — 140 g',
+      alts:['Vitello filetto — 150 g','Vitellone tagli magri — 150 g','Petto di pollo — 160 g','Tacchino petto — 120 g','Acciuga o alice — 170 g','Cernia — 200 g','Dentice — 160 g','Merluzzo o nasello — 230 g','Orata fresca — 130 g','Palombo — 200 g','Pesce spada — 150 g','Rombo — 200 g','San Pietro — 210 g','Sogliola — 190 g','Spigola — 200 g','Tonno — 100 g','Trota — 190 g','Tonno sott\'olio sgocciolato — 80 g','Halibut — 140 g','Salmone fresco — 90 g','Sgombro — 90 g','Crescenza — 60 g','Fiocchi di latte — 140 g','Mozzarella di vacca — 60 g','Ricotta di vacca — 110 g','Stracchino — 50 g','Caciottina fresca — 60 g','Robiola — 50 g','Uova di gallina intero — 120 g','Tacchino fesa — 80 g'] },
+    { label:'Verdura', base:'Verdure fresche — 200 g',
+      note:'Nota a mano: no zucca. Carota cruda sì.' },
+    { label:'Condimento', base:'Olio EVO — 3 cucchiaini a crudo', note:'Correzione a mano: da 15 g a 3 cc.' }
+  ]},
+  { name:'Spuntino serale', time:'', slots:[
+    { label:'Spuntino', base:'Noci 20 g + mela 150 g',
+      note:'Cerchiato sul foglio: non saltarlo. Regge la glicemia del mattino ed evita la chetosi notturna.' }
+  ]}
+];
+
+function renderDiet(){
+  document.getElementById('meals').innerHTML = DIET.map((m,i)=>`
+    <div class="meal" data-i="${i}">
+      <div class="meal-h">
+        <b>${m.name}</b>
+        <span class="t">${m.slots.length} voci</span>
+      </div>
+      <div class="meal-b">
+        ${m.slots.map((s,j)=>`
+          <div class="slot">
+            <label>${s.label}</label>
+            ${ s.alts && s.alts.length
+              ? `<select data-sel="${i}-${j}">
+                   <option>${s.base}</option>
+                   ${s.alts.map(a=>`<option>${a}</option>`).join('')}
+                 </select>`
+              : `<div class="fixed">${s.base}</div>` }
+            ${ s.note ? `<div class="note-md">${s.note}</div>` : '' }
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+
+  document.querySelectorAll('.meal-h').forEach(h=>{
+    h.onclick=()=>h.parentElement.classList.toggle('open');
+  });
+  // ripristina scelte
+  document.querySelectorAll('[data-sel]').forEach(async sel=>{
+    try{
+      const r = await window.storage.get('curva:diet:'+sel.dataset.sel);
+      if(r) sel.value = r.value;
+    }catch{}
+    sel.onchange=async()=>{
+      try{ await window.storage.set('curva:diet:'+sel.dataset.sel, sel.value); }catch{}
+    };
+  });
+}
+
+/* ---------- nav ---------- */
+function go(p){
+  document.querySelectorAll('.page').forEach(s=>s.classList.toggle('on', s.id==='p-'+p));
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.p===p));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.p));
+
+/* ---------- init ---------- */
+async function boot(){
+  await load();
+  renderToday(); renderLog(); renderDiet(); runTimer();
+}
+
+/* sessione già aperta (refresh o ritorno da background) → non richiedere di nuovo */
+(()=>{
+  let open=false;
+  try{ open = sessionStorage.getItem('curva:open')==='1'; }catch{}
+  if(open){
+    document.getElementById('lock').classList.add('hide');
+    document.body.classList.remove('locked');
+    booted=true; boot();
+  } else {
+    document.getElementById('lkUser').focus();
+  }
+})();
+</script>
+</body>
+</html>
